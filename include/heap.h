@@ -11,7 +11,7 @@ typedef struct object {
     uint8_t marked;
     size_t size;
     struct object *next; /* intrusive linked list for GC */
-    int32_t fields[];   /* flexible array for field storage */
+    int64_t fields[];   /* flexible array — holds ints and object pointers */
 } object;
 
 extern object *heap_head;

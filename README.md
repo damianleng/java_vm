@@ -8,14 +8,7 @@ Built as an Operating Systems course project to demonstrate core OS concepts: me
 
 ## What It Does
 
-You write Java, compile it with `javac`, and run it with this JVM instead of the standard one:
-
-```bash
-javac Hello.java
-./jvm Hello.class
-```
-
-The JVM reads the binary `.class` file, decodes the bytecode instructions, manages its own heap memory, and garbage collects objects that are no longer reachable — all implemented in C.
+You write Java, compile it with `javac`, and run it with this JVM instead of the standard one. The JVM reads the binary `.class` file, decodes the bytecode instructions, manages its own heap memory, and garbage collects objects that are no longer reachable — all implemented in C.
 
 ---
 
@@ -57,50 +50,96 @@ The JVM reads the binary `.class` file, decodes the bytecode instructions, manag
 .
 ├── include/          # Header files
 │   ├── classfile.h   # Class file structures
-│   ├── interpreter.h # Execution frame
+│   ├── interpreter.h # Execution frame and opcode definitions
 │   ├── heap.h        # Heap allocator interface
 │   └── gc.h          # Garbage collector interface
 ├── src/
-│   ├── main.c                  # Entry point
-│   ├── classfile/classfile.c   # .class file parser
+│   ├── main.c                    # Entry point
+│   ├── classfile/classfile.c     # .class file parser
 │   ├── interpreter/interpreter.c # Bytecode execution engine
-│   ├── memory/heap.c           # Heap memory management
-│   ├── gc/gc.c                 # Mark-and-sweep GC
-│   └── runtime/runtime.c       # Native method stubs
-├── tests/classes/    # Java .class files for testing
+│   ├── memory/heap.c             # Heap memory management
+│   ├── gc/gc.c                   # Mark-and-sweep GC
+│   └── runtime/runtime.c         # Native method stubs
+├── tests/
+│   ├── Hello.java        # Basic println test
+│   ├── Arithmetic.java   # Integer arithmetic test
+│   ├── Loops.java        # For/while loop test
+│   ├── Objects.java      # Object creation and field access test
+│   ├── Arrays.java       # Array allocation and access test
+│   ├── classes/          # Compiled .class files (generated)
+│   └── run_tests.sh      # Test runner script
 ├── Makefile
-└── Dockerfile
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 ---
 
-## Build & Run
+## Running with Docker (Recommended)
 
-**Requirements:** `gcc`, `make`
+No compiler or JDK installation needed — just Docker.
 
+**1. Clone the repo and build the image:**
 ```bash
-# Build
+git clone <repo-url>
+cd project
+docker compose build
+```
+
+**2. Run the full test suite:**
+```bash
+docker compose run test
+```
+
+Expected output:
+```
+Compiling test files...
+
+PASS  Hello
+PASS  Arithmetic
+PASS  Loops
+PASS  Objects
+PASS  Arrays
+
+Results: 5 passed, 0 failed
+```
+
+**3. Run a single class file:**
+```bash
+# The test service compiles .class files into tests/classes/ on your host.
+# Run any of them individually:
+docker compose run jvm tests/classes/Hello.class
+docker compose run jvm tests/classes/Objects.class
+```
+
+**Rebuilding after source changes:**
+```bash
+docker compose build
+docker compose run test
+```
+
+---
+
+## Running Locally (Optional)
+
+Requires `gcc`, `make`, and a JDK (`javac`).
+
+**macOS:**
+```bash
+brew install openjdk
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+```
+
+**Build and test:**
+```bash
 make
-
-# Run a .class file
-./jvm path/to/YourClass.class
-
-# Clean build artifacts
-make clean
+./tests/run_tests.sh
 ```
 
----
-
-## Docker
-
-No gcc? No problem. Run with Docker:
-
+**Run a single class:**
 ```bash
-# Build image
-docker build -t myjvm .
-
-# Run a .class file (mount the folder containing your .class files)
-docker run --rm -v $(pwd):/classes myjvm /classes/YourClass.class
+javac -d tests/classes tests/Hello.java
+./jvm tests/classes/Hello.class
 ```
 
 ---

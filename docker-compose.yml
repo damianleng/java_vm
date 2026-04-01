@@ -1,0 +1,17 @@
+services:
+
+  # Run the full test suite
+  # Usage: docker compose run test
+  test:
+    build: .
+    entrypoint: ["bash"]
+    command: ["tests/run_tests.sh"]
+    volumes:
+      - ./tests:/app/tests
+
+  # Run a single .class file
+  # Usage: docker compose run jvm tests/classes/Hello.class
+  jvm:
+    build: .
+    volumes:
+      - ./tests/classes:/app/tests/classes

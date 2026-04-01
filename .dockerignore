@@ -1,0 +1,3 @@
+jvm
+src/**/*.o
+tests/classes/

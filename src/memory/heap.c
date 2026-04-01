@@ -20,7 +20,7 @@ void heap_destroy(void) {
 }
 
 object *heap_alloc(uint16_t class_index, size_t num_fields) {
-    size_t size = sizeof(object) + num_fields * sizeof(int32_t);
+    size_t size = sizeof(object) + num_fields * sizeof(int64_t);
     object *obj = calloc(1, size);
     if (!obj) {
         fprintf(stderr, "OutOfMemoryError\n");
