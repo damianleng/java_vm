@@ -1,0 +1,21 @@
+# Claude
+CLAUDE.md
+
+# Project docs
+*.pdf
+
+# Build output
+build/
+*.o
+*.a
+*.out
+jvm
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
