@@ -14,8 +14,15 @@ typedef struct gc_root_frame {
 } gc_root_frame;
 
 #define GC_MAX_CALL_DEPTH 256
-extern gc_root_frame gc_call_stack[];
-extern int           gc_call_depth;
+
+/* TLS variables are defined in src/threads/threads.c.
+   The macros below let the rest of the codebase use the old names
+   transparently — each thread automatically sees its own copy. */
+extern __thread gc_root_frame tls_gc_call_stack[];
+extern __thread int           tls_gc_call_depth;
+
+#define gc_call_stack tls_gc_call_stack
+#define gc_call_depth tls_gc_call_depth
 
 void gc_mark(object *root);
 void gc_sweep(void);

@@ -112,6 +112,8 @@ typedef struct frame {
 #define OP_NEWARRAY      0xbc
 #define OP_ANEWARRAY     0xbd
 #define OP_ARRAYLENGTH   0xbe
+#define OP_MONITORENTER  0xc2
+#define OP_MONITOREXIT   0xc3
 
 /*
  * Execute a method. args/args_count pre-populate locals[0..args_count-1].

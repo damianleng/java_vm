@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "../../include/interpreter.h"
 #include "../../include/classfile.h"
 #include "../../include/heap.h"
 #include "../../include/gc.h"
-
-/* GC root registry — one entry per active call frame */
-gc_root_frame gc_call_stack[GC_MAX_CALL_DEPTH];
-int           gc_call_depth = 0;
+#include "../../include/threads.h"
 
 /* Sentinel pushed by getstatic for System.out (never dereferenced) */
 #define SYSTEM_OUT_SENTINEL ((int64_t)0x7EFEFEFEFEFEFEFEL)
@@ -63,6 +61,50 @@ static int get_field_index(const class_file *cf, uint16_t fieldref_idx, int is_s
         slot++;
     }
     return -1;
+}
+
+/* ── class name helpers ──────────────────────────────────────────────────── */
+
+/* Return the class name string for a CONSTANT_Methodref entry */
+static const char *get_methodref_class(const class_file *cf, const cp_info *mref) {
+    if (!mref || mref->tag != CP_METHODREF) return NULL;
+    uint16_t ci = (uint16_t)((mref->info[0] << 8) | mref->info[1]);
+    if (ci == 0 || ci > cf->constant_pool_count) return NULL;
+    cp_info *cls = &cf->constant_pool[ci - 1];
+    if (cls->tag != CP_CLASS) return NULL;
+    uint16_t ni = (uint16_t)((cls->info[0] << 8) | cls->info[1]);
+    return classfile_get_utf8(cf, ni);
+}
+
+/* Return the name of the class being executed */
+static const char *get_this_class_name(const class_file *cf) {
+    if (cf->this_class == 0 || cf->this_class > cf->constant_pool_count) return NULL;
+    cp_info *cls = &cf->constant_pool[cf->this_class - 1];
+    if (cls->tag != CP_CLASS) return NULL;
+    uint16_t ni = (uint16_t)((cls->info[0] << 8) | cls->info[1]);
+    return classfile_get_utf8(cf, ni);
+}
+
+/* ── thread entry ────────────────────────────────────────────────────────── */
+
+typedef struct {
+    class_file *cf;
+    object     *this_obj;
+} thread_args_t;
+
+static void *thread_entry(void *arg) {
+    thread_args_t *ta = (thread_args_t *)arg;
+    threads_register_self();
+
+    method_info *run_method = classfile_find_method(ta->cf, "run", "()V");
+    if (run_method) {
+        int64_t self_arg = (int64_t)(uintptr_t)ta->this_obj;
+        interpreter_execute(ta->cf, run_method, &self_arg, 1);
+    }
+
+    threads_unregister_self();
+    free(ta);
+    return NULL;
 }
 
 /* ── interpreter ─────────────────────────────────────────────────────────── */
@@ -481,14 +523,22 @@ int64_t interpreter_execute(class_file *cf, method_info *method,
             for (int i = nargs; i >= 1; i--) call_args[i] = POP();
             call_args[0] = POP(); /* receiver (this) */
 
-            method_info *target = classfile_find_method(cf, mname, mdesc);
-            if (target) {
-                /* return value is void for constructors; others push result */
-                int64_t result = interpreter_execute(cf, target, call_args,
-                                                     (uint16_t)(nargs + 1));
-                if (has_return_value(mdesc)) PUSH(result);
+            /* Only dispatch if the method ref targets our own class.
+               This prevents super.<init>() (e.g. Thread.<init>) from
+               resolving to our own <init> and looping infinitely. */
+            const char *ref_class  = get_methodref_class(cf, mref);
+            const char *this_class = get_this_class_name(cf);
+            int same_class = (!ref_class || !this_class ||
+                              strcmp(ref_class, this_class) == 0);
+            if (same_class) {
+                method_info *target = classfile_find_method(cf, mname, mdesc);
+                if (target) {
+                    int64_t result = interpreter_execute(cf, target, call_args,
+                                                         (uint16_t)(nargs + 1));
+                    if (has_return_value(mdesc)) PUSH(result);
+                }
             }
-            /* if target not found (e.g. Object.<init>), silently skip */
+            /* if not found or different class (e.g. Object.<init>, Thread.<init>): skip */
             break;
         }
 
@@ -517,6 +567,24 @@ int64_t interpreter_execute(class_file *cf, method_info *method,
                     printf("%s\n", call_args[0] ? "true" : "false");
                 else if (mdesc && strcmp(mdesc, "()V") == 0)
                     printf("\n");
+            } else if (mname && strcmp(mname, "start") == 0 &&
+                       mdesc && strcmp(mdesc, "()V") == 0) {
+                /* Thread.start() — spawn a pthread that calls run() */
+                object *thread_obj = (object *)(uintptr_t)receiver;
+                if (thread_obj) {
+                    thread_args_t *ta = malloc(sizeof(thread_args_t));
+                    ta->cf       = cf;
+                    ta->this_obj = thread_obj;
+                    pthread_create(&thread_obj->thread_id, NULL, thread_entry, ta);
+                    thread_obj->is_thread = 1;
+                }
+            } else if (mname && strcmp(mname, "join") == 0 &&
+                       mdesc && strcmp(mdesc, "()V") == 0) {
+                /* Thread.join() — wait for the thread to finish */
+                object *thread_obj = (object *)(uintptr_t)receiver;
+                if (thread_obj && thread_obj->is_thread) {
+                    pthread_join(thread_obj->thread_id, NULL);
+                }
             } else {
                 /* dispatch to user-defined instance method */
                 method_info *target = classfile_find_method(cf, mname, mdesc);
@@ -557,6 +625,19 @@ int64_t interpreter_execute(class_file *cf, method_info *method,
 
             int64_t result = interpreter_execute(cf, target, call_args, (uint16_t)nargs);
             if (has_return_value(mdesc)) PUSH(result);
+            break;
+        }
+
+        case OP_MONITORENTER: {
+            object *obj = (object *)(uintptr_t)POP();
+            if (!obj) { fprintf(stderr, "NullPointerException\n"); goto done; }
+            pthread_mutex_lock(&obj->monitor);
+            break;
+        }
+        case OP_MONITOREXIT: {
+            object *obj = (object *)(uintptr_t)POP();
+            if (!obj) { fprintf(stderr, "NullPointerException\n"); goto done; }
+            pthread_mutex_unlock(&obj->monitor);
             break;
         }
 

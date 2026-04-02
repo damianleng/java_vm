@@ -55,6 +55,8 @@ check Objects "7
 check Arrays "6
 5"
 
+check Threads "200"
+
 # ── summary ───────────────────────────────────────────────────────────────────
 
 echo ""

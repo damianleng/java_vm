@@ -7,14 +7,15 @@ SRCS = src/main.c \
        src/interpreter/interpreter.c \
        src/memory/heap.c \
        src/gc/gc.c \
-       src/runtime/runtime.c
+       src/runtime/runtime.c \
+       src/threads/threads.c
 
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lpthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

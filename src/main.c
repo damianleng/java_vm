@@ -4,6 +4,7 @@
 #include "interpreter.h"
 #include "heap.h"
 #include "gc.h"
+#include "threads.h"
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -12,6 +13,7 @@ int main(int argc, char *argv[]) {
     }
 
     heap_init();
+    threads_init();
 
     class_file *cf = classfile_load(argv[1]);
     if (!cf) {
@@ -30,6 +32,7 @@ int main(int argc, char *argv[]) {
     interpreter_execute(cf, main_method, NULL, 0); /* main takes no primitive args */
 
     classfile_free(cf);
+    threads_unregister_self();
     heap_destroy();
     return 0;
 }
