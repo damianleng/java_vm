@@ -176,6 +176,10 @@ int64_t interpreter_execute(class_file *cf, method_info *method,
                 int32_t v = (int32_t)((cp->info[0] << 24) | (cp->info[1] << 16)
                                      | (cp->info[2] << 8)  |  cp->info[3]);
                 PUSH(v);
+            } else if (cp->tag == CP_STRING) {
+                uint16_t str_idx = (uint16_t)((cp->info[0] << 8) | cp->info[1]);
+                const char *str = classfile_get_utf8(cf, str_idx);
+                PUSH((int64_t)(uintptr_t)str);
             } else { PUSH(0); }
             break;
         }
@@ -565,6 +569,8 @@ int64_t interpreter_execute(class_file *cf, method_info *method,
                     printf("%d\n", (int32_t)call_args[0]);
                 else if (mdesc && strcmp(mdesc, "(Z)V") == 0)
                     printf("%s\n", call_args[0] ? "true" : "false");
+                else if (mdesc && strcmp(mdesc, "(Ljava/lang/String;)V") == 0)
+                    printf("%s\n", call_args[0] ? (const char *)(uintptr_t)call_args[0] : "null");
                 else if (mdesc && strcmp(mdesc, "()V") == 0)
                     printf("\n");
             } else if (mname && strcmp(mname, "start") == 0 &&
