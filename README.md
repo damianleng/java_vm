@@ -75,7 +75,7 @@ You write Java, compile it with `javac`, and run it with this JVM instead of the
 
 ---
 
-## Running with Docker (Recommended)
+## Running with Docker
 
 No compiler or JDK installation needed — just Docker.
 
@@ -120,26 +120,29 @@ docker compose run test
 
 ---
 
-## Running Locally (Optional)
+## Running Locally
 
 Requires `gcc`, `make`, and a JDK (`javac`).
 
-**macOS:**
+**1. Install Java (macOS):**
 ```bash
-brew install openjdk
-export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+brew install --cask temurin
 ```
 
-**Build and test:**
+**2. Build the JVM:**
 ```bash
 make
-./tests/run_tests.sh
 ```
 
-**Run a single class:**
+**3. Compile a Java file and run it:**
 ```bash
 javac -d tests/classes tests/Hello.java
 ./jvm tests/classes/Hello.class
+```
+
+**4. Run the full test suite:**
+```bash
+./tests/run_tests.sh
 ```
 
 ---
